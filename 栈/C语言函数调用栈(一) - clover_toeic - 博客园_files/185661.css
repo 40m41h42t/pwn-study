@@ -1,0 +1,8 @@
+#div_digg {
+    position: fixed;
+    bottom: 0px;
+    right: 250px;
+    padding: 8px 8px 8px 10px;
+    background-color: #fff;
+    border: 1px solid #D9DBE1;
+}
