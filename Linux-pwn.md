@@ -390,7 +390,7 @@ p.interactive()
 
 ### ret2libc
 
-例1
+#### 例1
 
 ```bash
 [*] '/mnt/f/github/pwn-study/Linux-pwn/ret2libc1'
@@ -437,7 +437,7 @@ p.sendline(payload)
 p.interactive()
 ```
 
-例2
+#### 例2
 
 ```bash
 [*] '/mnt/f/github/pwn-study/Linux-pwn/ret2libc2'
@@ -516,3 +516,20 @@ p.interactive()
 ```
 
 虽然ctf-wiki上说难度和第一个一样，但是我感觉又学到了很多东西呢。。
+
+#### 例3
+
+```bash
+[*] '/mnt/f/github/pwn-study/Linux-pwn/ret2libc3'
+    Arch:     i386-32-little
+    RELRO:    Partial RELRO
+    Stack:    No canary found
+    NX:       NX enabled
+    PIE:      No PIE (0x8048000)
+```
+
+这个难度明显更大了。。没有`system`没有`/bin/sh`。当然其漏洞的位置没有变化，始终是`gets()`函数溢出。
+
+该怎么办呢？我们结题的方向始终不变：执行`system("/bin/sh")`，拿到shell。
+
+在这之前，根据system函数的相对位置不变这一原则，我们首先泄露其他函数的地址，根据glibc的版本判断system函数的位置。本道题提供了 `libc.so` ，如果不提供的话需要使用相应的工具。有时间也要试一下。
