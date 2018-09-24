@@ -604,3 +604,30 @@ p.interactive()
 ```
 
 接下来就是没有libc的情况了，我要怎么办才能知道自己要的是哪个版本的libc呢？
+
+忽然发现没有libc啊。。没libc怎么搞事来着？怪不得跑脚本会失败呢。。
+
+下好libc，先尝试着跑wp提供的脚本。
+
+还是有问题：我跑脚本提示选择libc，有如下版本(针对`__libc_start_main`)：
+
+```
+0xf7d9d540
+Multi Results:
+ 0: archive-glibc (id libc6-i386_2.23-0ubuntu3_amd64)
+ 1: debian-glibc (id libc6-i386_2.23-0experimental2_amd64)
+ 2: archive-glibc (id libc6_2.23-0ubuntu3_i386)
+ 3: debian-glibc (id libc6-i686_2.23-0experimental2_i386)
+ 4: debian-glibc (id libc6-xen_2.23-0experimental2_i386)
+```
+
+而我手动 find 的时候是这样子的：
+
+```bash
+➜  libc-database git:(master) ./find __libc_start_main 540
+ubuntu-xenial-i386-libc6 (id libc6_2.23-0ubuntu10_i386)
+archive-glibc (id libc6_2.23-0ubuntu3_i386)
+ubuntu-xenial-amd64-libc6-i386 (id libc6-i386_2.23-0ubuntu10_amd64)
+archive-glibc (id libc6-i386_2.23-0ubuntu3_amd64)
+```
+
