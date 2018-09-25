@@ -645,3 +645,24 @@ ubuntu-xenial-i386-libc6 (id libc6_2.23-0ubuntu10_i386)
 嘛，泄露libc还是成功的。。
 
 噗，暂时准备暂停脚本写作，先push一次再说~毕竟要github全绿啊~
+
+最后的习题也要看一下咯。
+
+#### 习题
+
+```bash
+➜  Linux-pwn git:(master) ✗ checksec ret2libc-nctu
+[*] '/mnt/f/github/pwn-study/Linux-pwn/ret2libc-nctu'
+    Arch:     i386-32-little
+    RELRO:    Partial RELRO
+    Stack:    No canary found
+    NX:       NX enabled
+    PIE:      No PIE (0x8048000)
+```
+
+很明显看出这是主动泄露`/bin/sh`的地址和`puts`的地址了。嘶~我们也能看到漏洞点位于`scanf`。在scanf之前`puts`了一次。除此之外也没什么好搞事情的地方。
+
+那么我们先leak出`puts`的地址，然后找到`system`的got再执行就可以啦。
+
+尝试构造一下payload：
+
