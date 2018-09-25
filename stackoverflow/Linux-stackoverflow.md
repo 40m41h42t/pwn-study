@@ -631,3 +631,17 @@ ubuntu-xenial-amd64-libc6-i386 (id libc6-i386_2.23-0ubuntu10_amd64)
 archive-glibc (id libc6-i386_2.23-0ubuntu3_amd64)
 ```
 
+很怪异。。可能是我太菜了吧；所以说我准备仿照 `LibcSearcher` 尝试自己写一下脚本。
+
+脚本的功能很简单：纯调用`libc-database`的脚本执行相关的功能。不过在那之前，我要手动测试以确认自己是不是误用的脚本。
+
+首先根据ret2libc3构造打印出`puts`的got地址的payload:
+
+```bash
+➜  libc-database git:(master) ./find puts ca0                     
+ubuntu-xenial-i386-libc6 (id libc6_2.23-0ubuntu10_i386)
+```
+
+嘛，泄露libc还是成功的。。
+
+噗，暂时准备暂停脚本写作，先push一次再说~毕竟要github全绿啊~
