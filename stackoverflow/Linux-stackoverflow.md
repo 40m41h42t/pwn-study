@@ -699,3 +699,21 @@ p.interactive()
 嘛终于不看wp构造成功了，虽然这道题也很简单啦。
 
 于是乎基本ROP就到这里啦，剩下的就看一下ctf-wiki就好了。我们接着跟着它的步伐，再做几道题吧~
+
+### 习题
+
+#### train.cs.nctu.edu.tw: rop
+
+这个只看到exp了，下一个
+
+#### 2013-PlaidCTF-ropasaurusrex
+
+```bash
+    Arch:     i386-32-little
+    RELRO:    No RELRO
+    Stack:    No canary found
+    NX:       NX enabled
+    PIE:      No PIE (0x8048000)
+```
+
+像这种就是很基础的啦。。
