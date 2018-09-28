@@ -753,3 +753,18 @@ p.close()
 
 ```
 
+#### Defcon 2015 Qualifier: R0pbaby
+
+```bash
+	Arch:     amd64-64-little
+    RELRO:    No RELRO
+    Stack:    No canary found
+    NX:       NX enabled
+    PIE:      PIE enabled
+    FORTIFY:  Enabled
+```
+
+有点看不懂。。待定
+
+## 花式栈溢出技巧
+
